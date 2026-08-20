@@ -1,98 +1,137 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { router } from 'expo-router';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import { BalanceCard } from '@/components/balance-card';
+import { EmptyState } from '@/components/empty-state';
+import { TransactionItem } from '@/components/transaction-item';
+import { AppText } from '@/components/ui/app-text';
+import { ScreenHeader } from '@/components/ui/screen-header';
+import { useTheme } from '@/hooks/use-theme';
+import { useTransactions } from '@/hooks/use-transactions';
+import { sortByNewest } from '@/utils/date';
+
+function getGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 11) return 'Chào buổi sáng';
+  if (hour < 18) return 'Chào buổi chiều';
+  return 'Chào buổi tối';
+}
 
 export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+  const { colors } = useTheme();
+  const { transactions, balance, totalIncome, totalExpense, isReady } = useTransactions();
+  const recentTransactions = sortByNewest(transactions).slice(0, 5);
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+  if (!isReady) {
+    return (
+      <SafeAreaView style={[styles.loading, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ScreenHeader eyebrow={getGreeting()} title="SmartSpend" />
+        <BalanceCard balance={balance} income={totalIncome} expense={totalExpense} />
+
+        <Pressable
+          onPress={() => router.push('/transaction/add')}
+          style={({ pressed }) => [
+            styles.quickAction,
+            { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.72 : 1 },
+          ]}>
+          <View style={[styles.quickIcon, { backgroundColor: colors.primarySoft }]}>
+            <Ionicons name="add" size={24} color={colors.primary} />
+          </View>
+          <View style={styles.quickCopy}>
+            <AppText variant="label">Thêm giao dịch</AppText>
+            <AppText variant="caption" color={colors.textSecondary}>Ghi lại thu nhập hoặc chi tiêu mới</AppText>
+          </View>
+          <Ionicons name="chevron-forward" size={19} color={colors.textMuted} />
+        </Pressable>
+
+        <View style={styles.sectionHeader}>
+          <AppText variant="subtitle">Giao dịch gần đây</AppText>
+          {transactions.length > 0 ? (
+            <Pressable onPress={() => router.push('/(tabs)/transactions')} hitSlop={10}>
+              <AppText variant="label" color={colors.primary}>Xem tất cả</AppText>
+            </Pressable>
+          ) : null}
+        </View>
+
+        <View style={[styles.listCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          {recentTransactions.length === 0 ? (
+            <EmptyState
+              title="Bắt đầu quản lý tài chính"
+              description="Các giao dịch mới sẽ xuất hiện tại đây."
+              actionLabel="Thêm giao dịch"
+              onAction={() => router.push('/transaction/add')}
+            />
+          ) : (
+            recentTransactions.map((transaction, index) => (
+              <View key={transaction.id}>
+                <TransactionItem
+                  transaction={transaction}
+                  onPress={() => router.push({ pathname: '/transaction/[id]', params: { id: transaction.id } })}
+                />
+                {index < recentTransactions.length - 1 ? (
+                  <View style={[styles.separator, { backgroundColor: colors.border }]} />
+                ) : null}
+              </View>
+            ))
+          )}
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
+  safeArea: { flex: 1 },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  content: {
+    width: '100%',
+    maxWidth: 720,
+    alignSelf: 'center',
+    padding: 20,
+    paddingBottom: 110,
+    gap: 21,
+  },
+  quickAction: {
+    minHeight: 72,
+    borderRadius: 20,
+    borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    paddingHorizontal: 14,
+    gap: 12,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  quickIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  quickCopy: { flex: 1, gap: 2 },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginTop: 3,
+  },
+  listCard: {
+    borderRadius: 21,
+    borderWidth: 1,
+    paddingHorizontal: 15,
+  },
+  separator: {
+    height: StyleSheet.hairlineWidth,
+    marginLeft: 57,
   },
 });
